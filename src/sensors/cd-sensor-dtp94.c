@@ -128,7 +128,7 @@ cd_sensor_get_sample_async (CdSensor *sensor,
 
 	/* save state */
 	state = g_slice_new0 (CdSensorAsyncState);
-	state->res = g_simple_async_result_new (G_OBJECT (sensor),
+	task = g_task_new (sensor,
 						callback,
 						user_data,
 						cd_sensor_get_sample_async);
@@ -221,20 +221,16 @@ cd_sensor_lock_async (CdSensor *sensor,
 		      GAsyncReadyCallback callback,
 		      gpointer user_data)
 {
-	GSimpleAsyncResult *res;
+	g_autoptr(GTask) task = NULL;
 
 	g_return_if_fail (CD_IS_SENSOR (sensor));
 
 	/* run in a thread */
-	res = g_simple_async_result_new (G_OBJECT (sensor),
-					 callback,
-					 user_data,
-					 cd_sensor_lock_async);
+	task = g_task_new (sensor, cancellable, callback, user_data);
 	g_simple_async_result_run_in_thread (res,
 					     cd_sensor_dtp94_lock_thread_cb,
 					     0,
 					     cancellable);
-	g_object_unref (res);
 }
 
 gboolean
@@ -242,16 +238,8 @@ cd_sensor_lock_finish (CdSensor *sensor,
 		       GAsyncResult *res,
 		       GError **error)
 {
-	GSimpleAsyncResult *simple;
-
-	g_return_val_if_fail (CD_IS_SENSOR (sensor), FALSE);
-	g_return_val_if_fail (G_IS_SIMPLE_ASYNC_RESULT (res), FALSE);
-	g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
-
-	simple = G_SIMPLE_ASYNC_RESULT (res);
-	if (g_simple_async_result_propagate_error (simple, error))
-		return FALSE;
-	return TRUE;
+	g_return_val_if_fail (g_task_is_valid (res, sensor), FALSE);
+	return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
@@ -284,20 +272,16 @@ cd_sensor_unlock_async (CdSensor *sensor,
 			GAsyncReadyCallback callback,
 			gpointer user_data)
 {
-	GSimpleAsyncResult *res;
+	g_autoptr(GTask) task = NULL;
 
 	g_return_if_fail (CD_IS_SENSOR (sensor));
 
 	/* run in a thread */
-	res = g_simple_async_result_new (G_OBJECT (sensor),
-					 callback,
-					 user_data,
-					 cd_sensor_unlock_async);
+	task = g_task_new (sensor, cancellable, callback, user_data);
 	g_simple_async_result_run_in_thread (res,
 					     cd_sensor_unlock_thread_cb,
 					     0,
 					     cancellable);
-	g_object_unref (res);
 }
 
 gboolean
@@ -305,16 +289,8 @@ cd_sensor_unlock_finish (CdSensor *sensor,
 			 GAsyncResult *res,
 			 GError **error)
 {
-	GSimpleAsyncResult *simple;
-
-	g_return_val_if_fail (CD_IS_SENSOR (sensor), FALSE);
-	g_return_val_if_fail (G_IS_SIMPLE_ASYNC_RESULT (res), FALSE);
-	g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
-
-	simple = G_SIMPLE_ASYNC_RESULT (res);
-	if (g_simple_async_result_propagate_error (simple, error))
-		return FALSE;
-	return TRUE;
+	g_return_val_if_fail (g_task_is_valid (res, sensor), FALSE);
+	return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 gboolean

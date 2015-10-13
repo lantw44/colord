@@ -244,7 +244,7 @@ cd_sensor_get_sample_async (CdSensor *sensor,
 
 	/* save state */
 	state = g_slice_new0 (CdSensorAsyncState);
-	state->res = g_simple_async_result_new (G_OBJECT (sensor),
+	task = g_task_new (sensor,
 						callback,
 						user_data,
 						cd_sensor_get_sample_async);
@@ -498,7 +498,7 @@ cd_sensor_unlock_async (CdSensor *sensor,
 
 	/* save state */
 	state = g_slice_new0 (CdSensorAsyncState);
-	state->res = g_simple_async_result_new (G_OBJECT (sensor),
+	task = g_task_new (sensor,
 						callback,
 						user_data,
 						cd_sensor_unlock_async);

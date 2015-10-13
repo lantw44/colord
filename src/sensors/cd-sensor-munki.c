@@ -419,7 +419,7 @@ cd_sensor_get_sample_async (CdSensor *sensor,
 
 	/* save state */
 	state = g_slice_new0 (CdSensorAsyncState);
-	state->res = g_simple_async_result_new (G_OBJECT (sensor),
+	task = g_task_new (sensor,
 						callback,
 						user_data,
 						cd_sensor_get_sample_async);
@@ -494,7 +494,7 @@ cd_sensor_munki_lock_thread_cb (GSimpleAsyncResult *res,
 	/* attach to the default mainloop */
 	ret = cd_usb_attach_to_context (priv->usb, NULL, &error);
 	if (!ret) {
-		g_simple_async_result_set_error (res, CD_SENSOR_ERROR,
+		g_task_return_new_error (task, CD_SENSOR_ERROR,
 						 CD_SENSOR_ERROR_NO_SUPPORT,
 						 "failed to attach to mainloop: %s",
 						 error->message);
@@ -508,7 +508,7 @@ cd_sensor_munki_lock_thread_cb (GSimpleAsyncResult *res,
 					  MUNKI_REQUEST_FIRMWARE_PARAMS,
 					  0, 0, buffer, 24, 2000);
 	if (retval < 0) {
-		g_simple_async_result_set_error (res, CD_SENSOR_ERROR,
+		g_task_return_new_error (task, CD_SENSOR_ERROR,
 						 CD_SENSOR_ERROR_NO_SUPPORT,
 						 "failed to get firmware parameters: %s",
 						 libusb_strerror (retval));
@@ -528,7 +528,7 @@ cd_sensor_munki_lock_thread_cb (GSimpleAsyncResult *res,
 					  MUNKI_REQUEST_CHIP_ID,
 					  0, 0, buffer, 8, 2000);
 	if (retval < 0) {
-		g_simple_async_result_set_error (res, CD_SENSOR_ERROR,
+		g_task_return_new_error (task, CD_SENSOR_ERROR,
 						 CD_SENSOR_ERROR_NO_SUPPORT,
 						 "failed to get chip id parameters: %s",
 						 libusb_strerror (retval));
@@ -545,7 +545,7 @@ cd_sensor_munki_lock_thread_cb (GSimpleAsyncResult *res,
 					  MUNKI_REQUEST_VERSION_STRING,
 					  0, 0, (guint8*) priv->version_string, 36, 2000);
 	if (retval < 0) {
-		g_simple_async_result_set_error (res, CD_SENSOR_ERROR,
+		g_task_return_new_error (task, CD_SENSOR_ERROR,
 						 CD_SENSOR_ERROR_NO_SUPPORT,
 						 "failed to get version string: %s",
 						 libusb_strerror (retval));
@@ -587,20 +587,16 @@ cd_sensor_lock_async (CdSensor *sensor,
 		      GAsyncReadyCallback callback,
 		      gpointer user_data)
 {
-	GSimpleAsyncResult *res;
+	g_autoptr(GTask) task = NULL;
 
 	g_return_if_fail (CD_IS_SENSOR (sensor));
 
 	/* run in a thread */
-	res = g_simple_async_result_new (G_OBJECT (sensor),
-					 callback,
-					 user_data,
-					 cd_sensor_lock_async);
+	task = g_task_new (sensor, cancellable, callback, user_data);
 	g_simple_async_result_run_in_thread (res,
 					     cd_sensor_munki_lock_thread_cb,
 					     0,
 					     cancellable);
-	g_object_unref (res);
 }
 
 gboolean
@@ -660,20 +656,16 @@ cd_sensor_unlock_async (CdSensor *sensor,
 			GAsyncReadyCallback callback,
 			gpointer user_data)
 {
-	GSimpleAsyncResult *res;
+	g_autoptr(GTask) task = NULL;
 
 	g_return_if_fail (CD_IS_SENSOR (sensor));
 
 	/* run in a thread */
-	res = g_simple_async_result_new (G_OBJECT (sensor),
-					 callback,
-					 user_data,
-					 cd_sensor_unlock_async);
+	task = g_task_new (sensor, cancellable, callback, user_data);
 	g_simple_async_result_run_in_thread (res,
 					     cd_sensor_unlock_thread_cb,
 					     0,
 					     cancellable);
-	g_object_unref (res);
 }
 
 gboolean

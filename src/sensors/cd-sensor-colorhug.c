@@ -166,7 +166,7 @@ cd_sensor_get_sample_async (CdSensor *sensor,
 	state = g_slice_new0 (CdSensorAsyncState);
 	if (cancellable != NULL)
 		state->cancellable = g_object_ref (cancellable);
-	state->res = g_simple_async_result_new (G_OBJECT (sensor),
+	task = g_task_new (sensor,
 						callback,
 						user_data,
 						cd_sensor_get_sample_async);
@@ -343,7 +343,7 @@ cd_sensor_lock_async (CdSensor *sensor,
 	state = g_slice_new0 (CdSensorAsyncState);
 	if (cancellable != NULL)
 		state->cancellable = g_object_ref (cancellable);
-	state->res = g_simple_async_result_new (G_OBJECT (sensor),
+	task = g_task_new (sensor,
 						callback,
 						user_data,
 						cd_sensor_lock_async);
@@ -376,16 +376,8 @@ cd_sensor_lock_finish (CdSensor *sensor,
 		       GAsyncResult *res,
 		       GError **error)
 {
-	GSimpleAsyncResult *simple;
-
-	g_return_val_if_fail (CD_IS_SENSOR (sensor), FALSE);
-	g_return_val_if_fail (G_IS_SIMPLE_ASYNC_RESULT (res), FALSE);
-	g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
-
-	simple = G_SIMPLE_ASYNC_RESULT (res);
-	if (g_simple_async_result_propagate_error (simple, error))
-		return FALSE;
-	return TRUE;
+	g_return_val_if_fail (g_task_is_valid (res, sensor), FALSE);
+	return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
@@ -418,20 +410,16 @@ cd_sensor_unlock_async (CdSensor *sensor,
 			GAsyncReadyCallback callback,
 			gpointer user_data)
 {
-	GSimpleAsyncResult *res;
+	g_autoptr(GTask) task = NULL;
 
 	g_return_if_fail (CD_IS_SENSOR (sensor));
 
 	/* run in a thread */
-	res = g_simple_async_result_new (G_OBJECT (sensor),
-					 callback,
-					 user_data,
-					 cd_sensor_unlock_async);
+	task = g_task_new (sensor, cancellable, callback, user_data);
 	g_simple_async_result_run_in_thread (res,
 					     cd_sensor_unlock_thread_cb,
 					     0,
 					     cancellable);
-	g_object_unref (res);
 }
 
 gboolean
@@ -439,16 +427,8 @@ cd_sensor_unlock_finish (CdSensor *sensor,
 			 GAsyncResult *res,
 			 GError **error)
 {
-	GSimpleAsyncResult *simple;
-
-	g_return_val_if_fail (CD_IS_SENSOR (sensor), FALSE);
-	g_return_val_if_fail (G_IS_SIMPLE_ASYNC_RESULT (res), FALSE);
-	g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
-
-	simple = G_SIMPLE_ASYNC_RESULT (res);
-	if (g_simple_async_result_propagate_error (simple, error))
-		return FALSE;
-	return TRUE;
+	g_return_val_if_fail (g_task_is_valid (res, sensor), FALSE);
+	return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 /**********************************************************************/
@@ -512,7 +492,7 @@ cd_sensor_colorhug_write_eeprom_cb (GObject *object,
 {
 	gboolean ret = FALSE;
 	ChDeviceQueue *device_queue = CH_DEVICE_QUEUE (object);
-	CdSensorAsyncState *state = (CdSensorAsyncState *) user_data;
+	GTask *task = G_TASK (user_data);
 	g_autoptr(GError) error = NULL;
 
 	/* get data */
@@ -523,14 +503,15 @@ cd_sensor_colorhug_write_eeprom_cb (GObject *object,
 	}
 
 	/* all done */
-	state->ret = TRUE;
-	cd_sensor_colorhug_set_options_state_finish (state, NULL);
+	g_task_return_boolean (task, TRUE);
 }
 
 static void
-cd_sensor_set_next_option (CdSensorAsyncState *state)
+cd_sensor_set_next_option (GTask *task)
 {
-	CdSensorColorhugPrivate *priv = cd_sensor_colorhug_get_private (state->sensor);
+	CdSensor *sensor = CD_SENSOR (g_task_get_source_object (task));
+	CdSensorColorhugPrivate *priv = cd_sensor_colorhug_get_private (sensor);
+	GHashTable *options = g_task_get_task_data (task);
 	ChSha1 sha1;
 	const gchar *key = NULL;
 	const gchar *magic = "Un1c0rn2";
@@ -540,23 +521,23 @@ cd_sensor_set_next_option (CdSensorAsyncState *state)
 	g_autoptr(GList) keys = NULL;
 
 	/* write eeprom to preserve settings */
-	keys = g_hash_table_get_keys (state->options);
+	keys = g_hash_table_get_keys (options);
 	if (keys == NULL) {
 		ch_device_queue_write_eeprom (priv->device_queue,
-					       priv->device,
-					       magic);
+					      priv->device,
+					      magic);
 		ch_device_queue_process_async (priv->device_queue,
 					       CH_DEVICE_QUEUE_PROCESS_FLAGS_NONE,
 					       state->cancellable,
 					       cd_sensor_colorhug_write_eeprom_cb,
-					       state);
+					       task);
 		return;
 	}
 
 	/* request */
 	key = (const gchar *) keys->data;
 	g_debug ("trying to set key %s", key);
-	value = g_hash_table_lookup (state->options, key);
+	value = g_hash_table_lookup (options, key);
 	if (g_strcmp0 (key, "remote-profile-hash") == 0) {
 
 		/* parse the hash */
@@ -572,7 +553,7 @@ cd_sensor_set_next_option (CdSensorAsyncState *state)
 		/* set the remote hash */
 		g_debug ("setting remote hash value %s",
 			 g_variant_get_string (value, NULL));
-		cd_sensor_add_option (state->sensor, key, value);
+		cd_sensor_add_option (sensor, key, value);
 		ch_device_queue_set_remote_hash (priv->device_queue,
 						 priv->device,
 						 &sha1);
@@ -580,15 +561,15 @@ cd_sensor_set_next_option (CdSensorAsyncState *state)
 					       CH_DEVICE_QUEUE_PROCESS_FLAGS_NONE,
 					       state->cancellable,
 					       cd_sensor_colorhug_set_options_cb,
-					       state);
+					       task);
 	} else {
-		g_set_error (&error,
-			     CD_SENSOR_ERROR,
-			     CD_SENSOR_ERROR_NO_SUPPORT,
-			     "Sensor option %s is not supported",
-			     key);
-		cd_sensor_colorhug_set_options_state_finish (state, error);
-		g_hash_table_remove (state->options, key);
+		g_task_return_new_error (task,
+					 CD_SENSOR_ERROR,
+					 CD_SENSOR_ERROR_NO_SUPPORT,
+					 "Sensor option %s is not supported",
+					 key);
+		g_hash_table_remove (options, key);
+		return;
 	}
 }
 
@@ -599,24 +580,13 @@ cd_sensor_set_options_async (CdSensor *sensor,
 			     GAsyncReadyCallback callback,
 			     gpointer user_data)
 {
-	CdSensorAsyncState *state;
-
 	g_return_if_fail (CD_IS_SENSOR (sensor));
-
-	/* set state */
+	task = g_task_new (sensor, cancellable, callback, user_data);
+	g_task_set_task_data (task,
+			      g_hash_table_ref (options),
+			      (GDestroyNotify) g_hash_table_unref);
 	cd_sensor_set_state (sensor, CD_SENSOR_STATE_BUSY);
-
-	/* save state */
-	state = g_slice_new0 (CdSensorAsyncState);
-	if (cancellable != NULL)
-		state->cancellable = g_object_ref (cancellable);
-	state->res = g_simple_async_result_new (G_OBJECT (sensor),
-						callback,
-						user_data,
-						cd_sensor_set_options_async);
-	state->sensor = g_object_ref (sensor);
-	state->options = g_hash_table_ref (options);
-	cd_sensor_set_next_option (state);
+	cd_sensor_set_next_option (task);
 }
 
 gboolean
@@ -624,19 +594,8 @@ cd_sensor_set_options_finish (CdSensor *sensor,
 			      GAsyncResult *res,
 			      GError **error)
 {
-	GSimpleAsyncResult *simple;
-
-	g_return_val_if_fail (CD_IS_SENSOR (sensor), FALSE);
-	g_return_val_if_fail (G_IS_SIMPLE_ASYNC_RESULT (res), FALSE);
-	g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
-
-	/* failed */
-	simple = G_SIMPLE_ASYNC_RESULT (res);
-	if (g_simple_async_result_propagate_error (simple, error))
-		return FALSE;
-
-	/* grab detail */
-	return g_simple_async_result_get_op_res_gboolean (simple);
+	g_return_val_if_fail (g_task_is_valid (res, sensor), FALSE);
+	return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void

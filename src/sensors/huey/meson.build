@@ -17,6 +17,6 @@ shared_module('colord_sensor_huey',
   dependencies : [
     gio,
     gusb,
-    gudev,
+    colord_sensors_extra_deps,
   ],
 )

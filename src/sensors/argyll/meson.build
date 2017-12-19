@@ -15,6 +15,6 @@ shared_module('colord_sensor_argyll',
   dependencies : [
     gio,
     gusb,
-    gudev,
+    colord_sensors_extra_deps,
   ],
 )

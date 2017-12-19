@@ -25,7 +25,9 @@
 #include <string.h>
 #include <glib-object.h>
 #include <math.h>
+#ifdef HAVE_UDEV
 #include <libudev.h>
+#endif
 
 #include "cd-edid.h"
 #include "cd-quirk.h"
@@ -107,6 +109,7 @@ static gchar *
 cd_edid_convert_pnp_id_to_string (const gchar *pnp_id)
 {
 	gchar *vendor = NULL;
+#ifdef HAVE_UDEV
 	struct udev_hwdb *hwdb = NULL;
 	struct udev_list_entry *e;
 	struct udev_list_entry *v;
@@ -139,6 +142,7 @@ out:
 		udev_hwdb_unref (hwdb);
 	if (udev != NULL)
 		udev_unref (udev);
+#endif
 	return vendor;
 }
 

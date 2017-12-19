@@ -23,7 +23,9 @@
 
 #include <glib-object.h>
 #include <gio/gio.h>
+#ifdef HAVE_UDEV
 #include <gudev/gudev.h>
+#endif
 
 #include "cd-sensor-client.h"
 #include "cd-sensor.h"
@@ -34,7 +36,9 @@ static void     cd_sensor_client_finalize	(GObject	*object);
 
 typedef struct
 {
+#ifdef HAVE_UDEV
 	GUdevClient			*gudev_client;
+#endif
 	GPtrArray			*array_sensors;
 	guint				 idx;
 } CdSensorClientPrivate;
@@ -68,6 +72,7 @@ cd_sensor_client_get_by_id (CdSensorClient *sensor_client,
 	return sensor;
 }
 
+#ifdef HAVE_UDEV
 static gboolean
 cd_sensor_client_add (CdSensorClient *sensor_client,
 		      GUdevDevice *device)
@@ -206,10 +211,12 @@ cd_sensor_client_uevent_cb (GUdevClient *gudev_client,
 out:
 	return;
 }
+#endif
 
 void
 cd_sensor_client_coldplug (CdSensorClient *sensor_client)
 {
+#ifdef HAVE_UDEV
 	CdSensorClientPrivate *priv = GET_PRIVATE (sensor_client);
 	GList *devices;
 	GList *l;
@@ -224,6 +231,7 @@ cd_sensor_client_coldplug (CdSensorClient *sensor_client)
 	}
 	g_list_foreach (devices, (GFunc) g_object_unref, NULL);
 	g_list_free (devices);
+#endif
 }
 
 static void
@@ -251,9 +259,11 @@ cd_sensor_client_init (CdSensorClient *sensor_client)
 	CdSensorClientPrivate *priv = GET_PRIVATE (sensor_client);
 	const gchar *subsystems[] = {"usb", "video4linux", NULL};
 	priv->array_sensors = g_ptr_array_new_with_free_func ((GDestroyNotify) g_object_unref);
+#ifdef HAVE_UDEV
 	priv->gudev_client = g_udev_client_new (subsystems);
 	g_signal_connect (priv->gudev_client, "uevent",
 			  G_CALLBACK (cd_sensor_client_uevent_cb), sensor_client);
+#endif
 }
 
 static void
@@ -262,7 +272,9 @@ cd_sensor_client_finalize (GObject *object)
 	CdSensorClient *sensor_client = CD_SENSOR_CLIENT (object);
 	CdSensorClientPrivate *priv = GET_PRIVATE (sensor_client);
 
+#ifdef HAVE_UDEV
 	g_object_unref (priv->gudev_client);
+#endif
 	g_ptr_array_unref (priv->array_sensors);
 
 	G_OBJECT_CLASS (cd_sensor_client_parent_class)->finalize (object);

@@ -16,6 +16,6 @@ shared_module('colord_sensor_dtp94',
   dependencies : [
     gio,
     gusb,
-    gudev,
+    colord_sensors_extra_deps,
   ],
 )

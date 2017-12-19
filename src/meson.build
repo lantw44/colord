@@ -26,6 +26,9 @@ resources_src = gnome.compile_resources(
 )
 
 colord_extra_deps = []
+if get_option('enable-udev')
+  colord_extra_deps += gudev
+endif
 if get_option('enable-systemd')
   colord_extra_deps += libsystemd
 endif
@@ -60,7 +63,6 @@ executable(
     colord_extra_deps,
     giounix,
     gmodule,
-    gudev,
     gusb,
     lcms,
     polkit,
@@ -96,9 +98,9 @@ if get_option('enable-tests')
       root_incdir,
     ],
     dependencies : [
+      colord_extra_deps,
       giounix,
       gmodule,
-      gudev,
       gusb,
       lcms,
       polkit,

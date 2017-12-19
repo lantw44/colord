@@ -28,7 +28,9 @@
 #include <gio/gio.h>
 #include <colord-private.h>
 
+#ifdef HAVE_UDEV
 #include <gudev/gudev.h>
+#endif
 #include <gusb.h>
 
 #include "cd-common.h"
@@ -60,16 +62,20 @@ GQuark		 cd_sensor_error_quark		(void);
 /* accessors */
 const gchar	*cd_sensor_get_id		(CdSensor		*sensor);
 const gchar	*cd_sensor_get_object_path	(CdSensor		*sensor);
+#ifdef HAVE_UDEV
 const gchar	*cd_sensor_get_device_path	(CdSensor		*sensor);
+#endif
 const gchar	*cd_sensor_get_usb_path		(CdSensor		*sensor);
 gboolean	 cd_sensor_register_object	(CdSensor		*sensor,
 						 GDBusConnection	*connection,
 						 GDBusInterfaceInfo	*info,
 						 GError			**error);
+#ifdef HAVE_UDEV
 gboolean	 cd_sensor_set_from_device	(CdSensor		*sensor,
 						 GUdevDevice		*device,
 						 GError			**error);
 GUdevDevice	*cd_sensor_get_device		(CdSensor		*sensor);
+#endif
 void		 cd_sensor_set_index		(CdSensor		*sensor,
 						 guint			 idx);
 GUsbDevice	*cd_sensor_open_usb_device	(CdSensor		*sensor,

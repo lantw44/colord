@@ -115,10 +115,14 @@ giounix = dependency('gio-unix-2.0', version : '>= 2.45.8')
 lcms = dependency('lcms2', version : '>= 2.6')
 sqlite = dependency('sqlite3')
 gusb = dependency('gusb', version : '>= 0.2.7')
-gudev = dependency('gudev-1.0')
 libm = cc.find_library('m', required: false)
-udev = dependency('udev')
-libudev = dependency('libudev')
+
+if get_option('enable-udev')
+  gudev = dependency('gudev-1.0')
+  udev = dependency('udev')
+  libudev = dependency('libudev')
+  conf.set('HAVE_UDEV', '1')
+endif
 
 if get_option('enable-systemd')
   systemd = dependency('systemd')
@@ -253,7 +257,9 @@ if get_option('enable-man')
   subdir('man')
 endif
 subdir('policy')
-subdir('rules')
+if get_option('enable-udev')
+  subdir('rules')
+endif
 subdir('src')
 
 meson.add_install_script('meson_post_install.sh',

@@ -1,3 +1,8 @@
+colord_sensors_extra_deps = []
+if get_option('enable-udev')
+  colord_sensors_extra_deps += gudev
+endif
+
 subdir('argyll')
 subdir('colorhug')
 subdir('dtp94')

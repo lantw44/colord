@@ -26,6 +26,11 @@ install_headers(
   subdir : 'colord-1/colorhug',
 )
 
+libcolorhug_extra_deps = []
+if get_option('enable-udev')
+  libcolorhug_extra_deps += libudev
+endif
+
 mapfile = 'colorhug.map'
 vflag = '-Wl,--version-script,@0@/@1@'.format(meson.current_source_dir(), mapfile)
 colorhug = shared_library(
@@ -41,11 +46,11 @@ colorhug = shared_library(
   soversion : lt_current,
   version : lt_version,
   dependencies : [
+    libcolorhug_extra_deps,
     giounix,
     gusb,
     lcms,
     libm,
-    libudev,
   ],
   c_args : [
       cargs,

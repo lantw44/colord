@@ -14,7 +14,7 @@ if get_option('enable-reverse')
     dependencies : [
       gio,
       gusb,
-      gudev,
+      colord_sensors_extra_deps,
     ],
   )
 endif

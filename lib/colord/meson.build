@@ -73,6 +73,12 @@ shared_src = [
   'cd-transform.c',
 ]
 
+libcolord_extra_deps = []
+if get_option('enable-udev')
+  libcolord_extra_deps += gudev
+  libcolord_extra_deps += libudev
+endif
+
 mapfile = 'colord.map'
 vflag = '-Wl,--version-script,@0@/@1@'.format(meson.current_source_dir(), mapfile)
 colordprivate = shared_library(
@@ -81,11 +87,10 @@ colordprivate = shared_library(
   soversion : lt_current,
   version : lt_version,
   dependencies : [
+    libcolord_extra_deps,
     giounix,
-    gudev,
     lcms,
     libm,
-    libudev,
   ],
   c_args : [
       cargs,
@@ -115,11 +120,10 @@ colord = shared_library(
   soversion : lt_current,
   version : lt_version,
   dependencies : [
+    libcolord_extra_deps,
     giounix,
-    gudev,
     lcms,
     libm,
-    libudev,
   ],
   c_args : [
       cargs,

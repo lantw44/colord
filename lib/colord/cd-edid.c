@@ -107,6 +107,7 @@ static gchar *
 cd_edid_convert_pnp_id_to_string (const gchar *pnp_id)
 {
 	gchar *vendor = NULL;
+#ifndef PNP_IDS
 	struct udev_hwdb *hwdb = NULL;
 	struct udev_list_entry *e;
 	struct udev_list_entry *v;
@@ -139,6 +140,32 @@ out:
 		udev_hwdb_unref (hwdb);
 	if (udev != NULL)
 		udev_unref (udev);
+#else
+	gchar *idx2;
+	gchar *idx;
+	g_autofree gchar *data = NULL;
+
+	if (!g_file_get_contents (PNP_IDS, &data, NULL, NULL))
+		goto out;
+
+	if (data == NULL)
+		goto out;
+
+	/* get the vendor name from the tab delimited data */
+	for (idx = data; idx != NULL; ) {
+		if (strncmp (idx, pnp_id, 3) == 0) {
+			idx2 = g_strstr_len (idx, -1, "\n");
+			if (idx2 != NULL)
+				*idx2 = '\0';
+			vendor = g_strdup (idx + 4);
+			break;
+		}
+		idx = g_strstr_len (idx, -1, "\n");
+		if (idx != NULL)
+			idx++;
+	}
+out:
+#endif
 	return vendor;
 }
 
